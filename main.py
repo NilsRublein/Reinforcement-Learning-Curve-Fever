@@ -11,11 +11,6 @@ import gym
 from gym.wrappers import Monitor
 import gym_ple
 
-from stable_baselines import DQN
-from stable_baselines import PPO2
-from stable_baselines.common.policies import MlpPolicy
-from stable_baselines.common.evaluation import evaluate_policy
-
 # The world's simplest agent!
 class RandomAgent(object):
     def __init__(self, action_space):
@@ -76,17 +71,6 @@ if __name__ == '__main__':
     logger.info("Successfully ran RandomAgent. Now trying to upload results to the scoreboard. If it breaks, you can always just try re-uploading the same results.")
     #gym.upload(outdir)
     # Syntax for uploading has changed
-    
-#%% Let's evaluate the un-trained agent, this should be a random agent.
-    model = PPO2(MlpPolicy, env, verbose=0)
-    eval_env = gym.make('CurveFever-v0' if len(sys.argv)<2 else sys.argv[1])
-    
-    # Random Agent, before training
-    mean_reward, std_reward = evaluate_policy(model, eval_env, n_eval_episodes=100)
-    print(f"mean_reward:{mean_reward:.2f} +/- {std_reward:.2f}")
-    
-#%% Train the agent and evaluate it
-    model.learn(total_timesteps=10000)
     mean_reward, std_reward = evaluate_policy(model, eval_env, n_eval_episodes=100)
     print(f"mean_reward:{mean_reward:.2f} +/- {std_reward:.2f}")
 
