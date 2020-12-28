@@ -1,0 +1,90 @@
+        """     
+        ######## Seems needed #########
+        collision   ok
+        drawtext    ok
+        init        ok
+        seed        ok
+        reset       ok
+        _step !Yes  ok
+        step  !No
+        render ? -> used in draw_text, ok
+        
+        ######### pygame wrapper ############
+        _setup
+        setAction (their setAction is _setAction in pygame wrapper)
+        tick
+        getScreenDims
+        setRNG
+        
+        ######### in pygame wrapper but modified ############
+        getActions, they removed the if statement that checks for python version > 3.
+        
+        ########## PLE #########
+        _setAction 
+        act
+        _tick
+        
+        ########### in PLE but modified ########
+        _oneStepAct
+        _getReward (Almost the same, instead of self.game.getScore() they use self.getScore() )
+        
+        """
+
+TODO:
+    - Add init params
+    - For now I am using Onestep from PLE, check if I need their modified version
+     
+    - figure out how to utilize dt for player.update(dt)
+    player.x = x + speed*dt  -> need some initial speed 
+    
+    here x = x + radius*speed*angle
+    
+    angle is handeld in key_events, and simply +/- 10 when a key is pressed
+    should I just multiply the angle stuff with dt in update()?
+    Also make one function for move/update
+    
+    
+    catcher has in key events 
+    if key == self.actions['left']:
+                    self.dx -= self.player_speed
+                    
+    Achtung has
+    if key == self.actions["left"]:
+                    self.player.angle -= 10
+                    
+                    
+    I see 2 options
+        1) Just try it like they did it since I fixed the issue with the int thing. However, dt is then effectively not used, what consequences has this?
+        2) Multiply with dt
+    
+    
+        Let's go with multiplying it
+        
+        ///////
+        
+        I can also lock it to the frame rate, the function expects that dt is  passed, but I don't actually have to use it!        
+        they defined reward and soem act stuff in step, how should I handle it now?
+        
+        Might need to adjust oneStepAct as well if I don't use dt
+        
+        
+        Their step is _step in PLEenv from gym-ple however, they use 
+        state = self.getGameState() instead of state = self._get_image()
+        
+        what is the difference? If there is none, I don't need their step()
+        (Perhaps I just need to rename getGetGameState..?)
+        
+        from gym atari_env.py https://github.com/openai/gym/blob/master/gym/envs/atari/atari_env.py
+        
+        def _get_image(self):
+            return self.ale.getScreenRGB2()
+
+        -> If I want to use their game step I just have to override the step function from gym-ple, test first if that is possible to do in curveEnv
+        I can then take from here easily the full screen as input, which needs then to go through a conv net as input at the agent code
+        
+        do I need their step? since there they use the getgame state shizzle
+        However, other games, e.g. catcher also just define the getgamestate function and that's that (is further used inside of the PLE class)
+        
+        
+        Conclusion:
+        rename step function, try it out with and without dt, check documentation again about dt, I might just leave it out ...
