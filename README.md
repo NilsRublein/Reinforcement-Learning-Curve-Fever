@@ -21,7 +21,6 @@ The `main` file is where all the magic happens. Here you specify the env that yo
 # TODO:
 
 - implement other agents, see resources.
-- implement Lilja's and Bohnsack's curve fever version using gym-ple
 - take full frame as input via a CNN instead of beam search
 - training against non-random opponents (e.g. version by Lilja & Bohnsack)
 
