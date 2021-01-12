@@ -1,4 +1,10 @@
+
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 # changed ple_game=True to false
+# Changed observation space from screen image to array of 12 vals
+# Changed state from image to beams
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
 import os
 import gym
@@ -29,15 +35,33 @@ class PLEEnv(gym.Env):
         self.game_state.init()
         self._action_set = self.game_state.getActionSet()
         self.action_space = spaces.Discrete(len(self._action_set))
+        
+        print("action set: ",self._action_set)
+        print("action space: ",self.action_space)
+        
         self.screen_height, self.screen_width = self.game_state.getScreenDims()
-        self.observation_space = spaces.Box(low=0, high=255, shape=(self.screen_width, self.screen_height, 3), dtype = np.uint8)
+        
+        #self.observation_space = spaces.Box(low=0, high=255, shape=(self.screen_width, self.screen_height, 3), dtype = np.uint8)
+        self.observation_space = spaces.Box(low=0, high=480, shape=(12,), dtype = np.uint8) # need right observation space! here, the 12 beam values 
+        
         self.viewer = None
 
+        self.obs_dim = self.observation_space.shape[0] # From Lilja
 
     def _step(self, a):
         reward = self.game_state.act(self._action_set[a])
-        state = self._get_image()
+        #state = self._get_image() 
+        state = self.game_state.getGameState() # Returns player position (x & y), player angle, beams
+        #state = np.reshape(state, [1, self.obs_dim])  # From Lilja
+        
+     
+        
+        # This bit transposes the 1D array of beams ...
+        #state = np.array([state])
+        #state = state.T
+        
         terminal = self.game_state.game_over()
+        test = "hallo"
         return state, reward, terminal, {}
 
     def _get_image(self):
@@ -50,9 +74,13 @@ class PLEEnv(gym.Env):
 
     # return: (states, observations)
     def _reset(self):
-        self.observation_space = spaces.Box(low=0, high=255, shape=(self.screen_width, self.screen_height, 3), dtype = np.uint8)
+        #self.observation_space = spaces.Box(low=0, high=255, shape=(self.screen_width, self.screen_height, 3), dtype = np.uint8)
+        self.observation_space = spaces.Box(low=0, high=480, shape=(12,), dtype = np.uint8) # Again, need only 12 values for the beams
         self.game_state.reset_game()
-        state = self._get_image()
+        #state = self._get_image()
+        state = self.game_state.getGameState() # Beams
+        
+        
         return state
 
     def _render(self, mode='human', close=False):
