@@ -3,30 +3,23 @@
 This file runs a pygame implementation of Curve fever in a gym env using gym-ple.
 The curve fever environment itself is located in PyGame-Learning-Environment-master\ple\games.
 
-After having trained the model, you can view stats in tensorbaord. 
-To do this, cd in your terminal to the folder of this file and enter 
-tensorboard --logdir ./dqn_curve_fever/
-in your terminal.
+For RL algorithms we are using stable-baselines 3 (SB3):
+    git:                https://github.com/DLR-RM/stable-baselines3 
+    documentation:      https://stable-baselines3.readthedocs.io/en/master/
 
-
-
-Questions for elena:
-    1) Why does my model give me a mean reward of max 230, and if I train the model again with the same parameters, just max 100?
-       Maybe this has something to do with exploration? Did I second not explore enough but in the first time?
-    2) Why are there these dents in the graphs?
-    3) Why does tensorboard only log single vals for this env, but does not for e.g. cartpole?
+In which action space can I use my agent?
+    Discrete            DQN
+    Box                 DDPQ, SAC, TD3
+    Discrete & Box      PPO, HER, A2C
     
-best values so far
-    - 0.05
-    - 0.085
-
 TODO:
-  
-    - Clean up, write functions for e.g. monitoring, fix graphs & tensorboard
-    - Exploration rate??
-    
+    - Graphs 
+        - Fix x axis of plot_results()
+        - Make a function to plot Reward vs loss (mean and std)
+        - Confirm that different agents show different values in tensorboard. E.g., DQN doesn't show loss
     - What other models would be interesting and are inplemented in SB3?
-    - Hyperparameter tuning,check 
+    - Make seperate env with continuous action space
+    - Hyperparameter tuning, see 
         https://github.com/optuna/optuna
         https://github.com/optuna/optuna/issues/1314 
         https://github.com/DLR-RM/rl-baselines3-zoo/blob/master/utils/hyperparams_opt.py
@@ -36,32 +29,20 @@ TODO:
         See the section "Hyperparameter Tuning" on https://github.com/DLR-RM/rl-baselines3-zoo
         It says that hyperparameter tuning is not implemented for DQN, but if you look in hyperparams_opt.py, there is actually a function for it.
         Try this out, if it doesnt work, it shouldnt be too hard to implement it yourself based on the functions for the other algorithms like TD3
-    - Make a dict for the params 
-    - progress bar, https://colab.research.google.com/github/araffin/rl-tutorial-jnrr19/blob/sb3/4_callbacks_hyperparameter_tuning.ipynb
-    
-    - Look into vectorization of env, normalization of action space, multiprocessing
-    - can train in one line
-    
-Misc
-    - Has a series on implementing DQN and other algorithms
-    - https://medium.com/analytics-vidhya/reinforcement-learning-d3qn-agent-with-prioritized-experience-replay-memory-6d79653e8561
-    
 """
 
 
-#%%
+#%% Load libraries etc.
 
-import logging
 import os, sys
 import gym
-#from gym.wrappers import Monitor # We wanna use the SB3 monitor
-import gym_ple
 
 import time
+import imageio
 import numpy as np
 import matplotlib.pyplot as plt
 
-from stable_baselines3 import DQN
+from stable_baselines3 import DQN, A2C
 from stable_baselines3.dqn import MlpPolicy
 from stable_baselines3.common.evaluation import evaluate_policy
 
@@ -71,14 +52,7 @@ from stable_baselines3.common.logger import Figure
 from stable_baselines3.common import results_plotter
 from stable_baselines3.common.results_plotter import load_results, ts2xy
 
-# The world's simplest agent!
-class RandomAgent(object):
-    def __init__(self, action_space):
-        self.action_space = action_space
 
-    def act(self, observation, reward, done):
-        return self.action_space.sample()
-    
 class FigureRecorderCallback(BaseCallback):
     def __init__(self, verbose=0):
         super(FigureRecorderCallback, self).__init__(verbose)
@@ -104,109 +78,125 @@ def moving_average(values, window):
 
 def plot_results(log_folder, title='Learning Curve'):
     """
-    plot the results
-
+    Plot results (rewards)
     :param log_folder: (str) the save location of the results to plot
     :param title: (str) the title of the task to plot
     """
     x, y = ts2xy(load_results(log_folder), 'timesteps') # Can also do 'episodes instead'
     y = moving_average(y, window=50)
+    
     # Truncate x    
     x = x[len(x) - len(y):]
-
+    
     fig = plt.figure(title)
     plt.plot(x, y)
     plt.xlabel('Number of Timesteps')
     plt.ylabel('Rewards')
     plt.title(title + " Smoothed")
     plt.show()
+    
+def make_gif(name, frames=350, fps_ = 30):
+    images = []
+    obs = model.env.reset()
+    img = model.env.render(mode='rgb_array')
+    for i in range(frames):
+        images.append(img)
+        action, _ = model.predict(obs)
+        obs, _, _ ,_ = model.env.step(action)
+        img = model.env.render(mode='rgb_array')
+    
+    imageio.mimsave(f'{name}.gif', [np.array(img) for i, img in enumerate(images) if i%2 == 0], fps=fps_)
+    
+def show_agent():
+    obs = env.reset()
+    while True:
+        action, _states = model.predict(obs, deterministic=True)
+        obs, reward, done, info = env.step(action)
+        env.render()
+        if done:
+          obs = env.reset()
 
-
+#%% 
 if __name__ == '__main__':
 
-    log_dir = "./dqn_curve_fever/" # Make sure you are in the rigt directory :)
+    log_dir = "./dqn_logs/" # In this folder we will save the best model of our agent and all the logs for tensorbaord. Change the name for a different agent!
     env = gym.make('CurveFever-v0' if len(sys.argv)<2 else sys.argv[1])
     env = Monitor(env, log_dir)
     
-    env.seed(0) #uncomment for when you want actual random agent with untrained model
-    #env = DummyVecEnv([lambda: env]) #This vectorizes the env, but that is already automatically done by SB3
+    #env.seed(0) # uncomment for when you want actual random agent with untrained model
 
-#%% Define model and callbacks
+#%% Define callbacks
 """
-SB3 DQN:
-https://stable-baselines3.readthedocs.io/en/master/modules/dqn.html
-
-This implementation provides only vanilla Deep Q-Learning and has no extensions such as 
-Double-DQN, Dueling-DQN and Prioritized Experience Replay.
-
 SB3 callbacks:
 https://stable-baselines3.readthedocs.io/en/master/guide/callbacks.html
-
 """
 
 eval_env = gym.make('CurveFever-v0') # evaluation env
-eval_callback = EvalCallback(eval_env, best_model_save_path='./logs/best_model',
-                             log_path='./logs/results', eval_freq=500)
+eval_callback = EvalCallback(eval_env, best_model_save_path= log_dir + 'best_model',
+                             log_path= log_dir + 'results', eval_freq=500)
 
-# Make a chain of callbacks
+# Make a chain of callbacks 
 callback = CallbackList([FigureRecorderCallback(), eval_callback])
-# callback = FigureRecorderCallback()
 
-# TODO: Make a dict for the params 
-# Best so far: gamma = 0.085
-model = DQN('MlpPolicy', env, verbose=1, buffer_size=500000, exploration_initial_eps=1.0, gamma=0.99, exploration_fraction= 0.2, learning_rate=0.0001, tensorboard_log=log_dir)
+#%% Define model and hyper parameters
+hyper_params = {
+    "buffer_size":              50000,
+    "exploration_initial_eps":  1,
+    "gamma":                    0.085,
+    "exploration_fraction":     0.1,
+    "learning_rate":           0.0001
+    }
 
+model = DQN('MlpPolicy', env, verbose=1, **hyper_params, tensorboard_log=log_dir)
+
+# Note that A2C  takes different hyper_params then DQN, for now I just have it on default values for testing
+# model = A2C('MlpPolicy', env, verbose=1, tensorboard_log=log_dir) 
 
 #%% eval untrained model
 print("Starting to evaluate untrained (Random) model")
 start = time.time()
 mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=100)
 end = time.time()
+
 print("Time elapsed in minutes: ", (end - start)/60)
 print(f"mean_reward:{mean_reward:.2f} +/- {std_reward:.2f}")
 
 #%% eval trained model
+time_steps = 1000
+
 print("Starting training")
 start = time.time()
-model.learn(total_timesteps=10000, log_interval=100, callback=callback)
+model.learn(total_timesteps=time_steps, log_interval=4, callback=callback)
 mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=100)
 end = time.time()
+
 print("Time elapsed in minutes: ", (end - start)/60)
 print(f"mean_reward:{mean_reward:.2f} +/- {std_reward:.2f}")
 
-#%% Load current best model (From this training run; actual best model is as of now DQN_gamma0_085 in ./models/)
-path_2_best_model = "./logs/best_model/best_model"
-model = DQN.load(path_2_best_model)
+#%% Plots
+'''
+How to plot with tensorboard:
+After having trained the model, you can view stats in tensorboard. 
+To do this, cd in your terminal to the folder of this file and enter
+    tensorboard --logdir ./dqn_logs/
+in your terminal. Make sure you are in the right python env!
 
-#%% more plots
-plot_results(log_dir)
-results_plotter.plot_results([log_dir], 10000, results_plotter.X_EPISODES, "Curve Fever, Episode Rewards vs Timesteps") #X_EPISODES , X_TIMESTEPS
+For more info see: https://stable-baselines3.readthedocs.io/en/master/guide/tensorboard.html
+'''
 
+plot_results(log_dir) # X axis is not correct ... don't know what is going wrong here yet.
+results_plotter.plot_results([log_dir], time_steps, results_plotter.X_TIMESTEPS, "Curve Fever, Episode Rewards vs Timesteps") 
+#results_plotter.plot_results([log_dir], 10000, results_plotter.X_EPISODES, "Curve Fever, Episode Rewards vs Episodes") 
 
 #%% Show trained agent 
-#env = Monitor(env, "recording", force=True)
-
-obs = env.reset()
-while True:
-    action, _states = model.predict(obs, deterministic=True)
-    obs, reward, done, info = env.step(action)
-    env.render()
-    if done:
-      obs = env.reset()
+show_agent()
       
-#%% Make a GIF
-import imageio
+#%% Make a GIF of the trained agent  
+make_gif('name', frames=200, fps_=60) 
 
-images = []
-obs = model.env.reset()
-img = model.env.render(mode='rgb_array')
-for i in range(500):
-    images.append(img)
-    action, _ = model.predict(obs)
-    obs, _, _ ,_ = model.env.step(action)
-    img = model.env.render(mode='rgb_array')
-
-imageio.mimsave('Trained_gamma0_99.gif', [np.array(img) for i, img in enumerate(images) if i%2 == 0], fps=29)
+#%% Load current best model (From this training run; actual best model is as of now DQN_gamma0_085 in ./models/)
+path_2_best_model = log_dir + "best_model/best_model"
+model = DQN.load(path_2_best_model)
 
 #%% Save a model
 name = "DQN_gamma0_085"
