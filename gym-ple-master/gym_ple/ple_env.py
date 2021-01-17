@@ -3,6 +3,7 @@
 # changed ple_game=True to false
 # Changed observation space from screen image to array of 12 vals
 # Changed state from image to beams
+# Added self.discrete to curve fever game itself. If you want to use FlappyBird etc, you need to add self.game = discrete to the respective game
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -34,7 +35,12 @@ class PLEEnv(gym.Env):
         self.game_state = PLE(game, fps=30, display_screen=display_screen)
         self.game_state.init()
         self._action_set = self.game_state.getActionSet()
-        self.action_space = spaces.Discrete(len(self._action_set))
+        
+        
+        if self.game_state.discrete:    
+            self.action_space = spaces.Discrete(len(self._action_set))
+        else:
+            self.action_space = self._action_set 
         
         print("action set: ",self._action_set)
         print("action space: ",self.action_space)
@@ -46,20 +52,20 @@ class PLEEnv(gym.Env):
         
         self.viewer = None
 
-        self.obs_dim = self.observation_space.shape[0] # From Lilja
-
     def _step(self, a):
-        reward = self.game_state.act(self._action_set[a])
+        
+        # 'a' is the action that our agent chooses. 
+        # In the case of a discrete action space, 'a' is the index for that action. 
+        # In a cont. space, 'a' is the cont. value that has been chosen by the agent
+        # print("a: ", a)
+        
+        if self.game_state.discrete:    
+            reward = self.game_state.act(self._action_set[a])
+        else:
+             reward = self.game_state.act(a)
+        
         #state = self._get_image() 
         state = self.game_state.getGameState() # Returns player position (x & y), player angle, beams
-        #state = np.reshape(state, [1, self.obs_dim])  # From Lilja
-        
-     
-        
-        # This bit transposes the 1D array of beams ...
-        #state = np.array([state])
-        #state = state.T
-        
         terminal = self.game_state.game_over()
         test = "hallo"
         return state, reward, terminal, {}
