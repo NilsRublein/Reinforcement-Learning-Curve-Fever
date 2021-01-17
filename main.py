@@ -29,6 +29,16 @@ TODO:
         See the section "Hyperparameter Tuning" on https://github.com/DLR-RM/rl-baselines3-zoo
         It says that hyperparameter tuning is not implemented for DQN, but if you look in hyperparams_opt.py, there is actually a function for it.
         Try this out, if it doesnt work, it shouldnt be too hard to implement it yourself based on the functions for the other algorithms like TD3
+        
+        
+        
+        
+
+################################################################################################
+############################################# MISC #############################################
+
+Changed PLE, PLEEnv, envs themselves, registrations (PLE & gym-ple)
+        
 """
 
 
@@ -36,13 +46,14 @@ TODO:
 
 import os, sys
 import gym
+import gym_ple
 
 import time
 import imageio
 import numpy as np
 import matplotlib.pyplot as plt
 
-from stable_baselines3 import DQN, A2C
+from stable_baselines3 import DQN, A2C, TD3
 from stable_baselines3.dqn import MlpPolicy
 from stable_baselines3.common.evaluation import evaluate_policy
 
@@ -120,7 +131,9 @@ def show_agent():
 if __name__ == '__main__':
 
     log_dir = "./dqn_logs/" # In this folder we will save the best model of our agent and all the logs for tensorbaord. Change the name for a different agent!
-    env = gym.make('CurveFever-v0' if len(sys.argv)<2 else sys.argv[1])
+    #env_name = 'CurveFeverContinuous-v0' # For discrete action space, use 'CurveFeverDiscrete-v0'
+    env_name = 'CurveFeverDiscrete-v0'
+    env = gym.make(env_name if len(sys.argv)<2 else sys.argv[1])
     env = Monitor(env, log_dir)
     
     #env.seed(0) # uncomment for when you want actual random agent with untrained model
@@ -131,7 +144,7 @@ SB3 callbacks:
 https://stable-baselines3.readthedocs.io/en/master/guide/callbacks.html
 """
 
-eval_env = gym.make('CurveFever-v0') # evaluation env
+eval_env = gym.make(env_name) # evaluation env
 eval_callback = EvalCallback(eval_env, best_model_save_path= log_dir + 'best_model',
                              log_path= log_dir + 'results', eval_freq=500)
 
@@ -151,6 +164,7 @@ model = DQN('MlpPolicy', env, verbose=1, **hyper_params, tensorboard_log=log_dir
 
 # Note that A2C  takes different hyper_params then DQN, for now I just have it on default values for testing
 # model = A2C('MlpPolicy', env, verbose=1, tensorboard_log=log_dir) 
+#model = TD3('MlpPolicy', env, verbose=1,gamma=0.8, learning_rate=0.0001, tensorboard_log=log_dir) 
 
 #%% eval untrained model
 print("Starting to evaluate untrained (Random) model")
