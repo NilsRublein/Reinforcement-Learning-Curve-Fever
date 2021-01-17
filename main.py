@@ -1,7 +1,12 @@
 
 """
+
+############################################# INFO #############################################
+
 This file runs a pygame implementation of Curve fever in a gym env using gym-ple.
 The curve fever environment itself is located in PyGame-Learning-Environment-master\ple\games.
+
+
 
 For RL algorithms we are using stable-baselines 3 (SB3):
     git:                https://github.com/DLR-RM/stable-baselines3 
@@ -12,13 +17,16 @@ In which action space can I use my agent?
     Box                 DDPQ, SAC, TD3
     Discrete & Box      PPO, HER, A2C
     
-TODO:
+Note that HER isn't really applicable yet to our case, atm we only have one goal (surviving) rather than two goals.
+It might have been interesting if we would have played against other agents
+    
+############################################# TODO #############################################
+
     - Graphs 
         - Fix x axis of plot_results()
         - Make a function to plot Reward vs loss (mean and std)
         - Confirm that different agents show different values in tensorboard. E.g., DQN doesn't show loss
-    - What other models would be interesting and are inplemented in SB3?
-    - Make seperate env with continuous action space
+
     - Hyperparameter tuning, see 
         https://github.com/optuna/optuna
         https://github.com/optuna/optuna/issues/1314 
@@ -32,12 +40,10 @@ TODO:
         
         
         
-        
-
-################################################################################################
 ############################################# MISC #############################################
 
-Changed PLE, PLEEnv, envs themselves, registrations (PLE & gym-ple)
+Note that the standard games of PLE like flappybird won't work in their current form, since I made changes to gym-ple and PLE to include both discrete and continuius action spaces.
+(The PLE games are all discrete.)
         
 """
 
@@ -53,9 +59,11 @@ import imageio
 import numpy as np
 import matplotlib.pyplot as plt
 
-from stable_baselines3 import DQN, A2C, TD3
+from stable_baselines3 import DQN, A2C, TD3, DDPG, SAC, PPO, HER
 from stable_baselines3.dqn import MlpPolicy
 from stable_baselines3.common.evaluation import evaluate_policy
+
+from stable_baselines3.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
 
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import BaseCallback, CallbackList, EvalCallback
@@ -131,8 +139,8 @@ def show_agent():
 if __name__ == '__main__':
 
     log_dir = "./dqn_logs/" # In this folder we will save the best model of our agent and all the logs for tensorbaord. Change the name for a different agent!
-    #env_name = 'CurveFeverContinuous-v0' # For discrete action space, use 'CurveFeverDiscrete-v0'
-    env_name = 'CurveFeverDiscrete-v0'
+    env_name = 'CurveFeverContinuous-v0' # For discrete action space, use 'CurveFeverDiscrete-v0'
+    #env_name = 'CurveFeverDiscrete-v0'
     env = gym.make(env_name if len(sys.argv)<2 else sys.argv[1])
     env = Monitor(env, log_dir)
     
@@ -153,18 +161,33 @@ callback = CallbackList([FigureRecorderCallback(), eval_callback])
 
 #%% Define model and hyper parameters
 hyper_params = {
-    "buffer_size":              50000,
+    "buffer_size":              50000, # Note that not all models can take this in as parameter. (e.g. DQN can, but A2C can't).
     "exploration_initial_eps":  1,
     "gamma":                    0.085,
     "exploration_fraction":     0.1,
     "learning_rate":           0.0001
     }
 
+
+# The noise objects for TD3 & DDPG. Might be better located somewhere else than here. 
+if env_name == 'CurveFeverContinuous-v0':
+    n_actions = env.action_space.shape[-1]
+    action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions)) # Can also use the other noise, OrnsteinUhlenbeckActionNoise 
+
+
+# Needs discrete env
 model = DQN('MlpPolicy', env, verbose=1, **hyper_params, tensorboard_log=log_dir)
 
-# Note that A2C  takes different hyper_params then DQN, for now I just have it on default values for testing
-# model = A2C('MlpPolicy', env, verbose=1, tensorboard_log=log_dir) 
-#model = TD3('MlpPolicy', env, verbose=1,gamma=0.8, learning_rate=0.0001, tensorboard_log=log_dir) 
+# Needs continuous env
+# model = TD3('MlpPolicy', env, verbose=1,gamma=0.8, learning_rate=0.0001, action_noise=action_noise, tensorboard_log=log_dir) # improved version of DDPG
+# model = DDPG('MlpPolicy', env, verbose=1,gamma=0.8, learning_rate=0.0001, action_noise=action_noise, tensorboard_log=log_dir) 
+# model = SAC('MlpPolicy', env, verbose=1,gamma=0.8, learning_rate=0.0001, tensorboard_log=log_dir) 
+
+# Either type of action space is fine
+#model = A2C('MlpPolicy', env, verbose=1, tensorboard_log=log_dir) 
+#model = PPO('MlpPolicy', env, verbose=1,gamma=0.8, learning_rate=0.0001, tensorboard_log=log_dir) #improved version of A2C
+
+
 
 #%% eval untrained model
 print("Starting to evaluate untrained (Random) model")
