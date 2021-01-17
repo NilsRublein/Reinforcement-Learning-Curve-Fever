@@ -92,8 +92,9 @@ class PLE(object):
     def __init__(self,
                  game, fps=30, frame_skip=1, num_steps=1,
                  reward_values={}, force_fps=True, display_screen=False,
-                 add_noop_action=True, state_preprocessor=None, rng=24):
+                 add_noop_action=True, state_preprocessor=None, rng=24, discrete = True):
 
+        self.discrete = discrete
         self.game = game
         self.fps = fps
         self.frame_skip = frame_skip
@@ -114,6 +115,11 @@ class PLE(object):
 
 
         if isinstance(self.game, PyGameWrapper):
+            
+            #print("self discrete: ",self.discrete)
+            #print("self game discrete: ",self.game.discrete)
+            self.discrete = self.game.discrete
+            
             if isinstance(rng, np.random.RandomState):
                 self.rng = rng
             else:
@@ -181,20 +187,24 @@ class PLE(object):
         """
         actions = self.game.actions
 
-        if (sys.version_info > (3, 0)): #python ver. 3
-            if isinstance(actions, dict) or isinstance(actions, dict_values):
-                actions = actions.values()
-        else:
-            if isinstance(actions, dict):
-                actions = actions.values()
-
-        actions = list(actions) #.values()
-        #print (actions)
-        #assert isinstance(actions, list), "actions is not a list"
-
-        if self.add_noop_action:
-            actions.append(self.NOOP)
-
+        if self.discrete:
+            if (sys.version_info > (3, 0)): #python ver. 3
+                if isinstance(actions, dict) or isinstance(actions, dict):
+                    actions = actions.values()
+            else:
+                if isinstance(actions, dict):
+                    actions = actions.values()
+                else:
+                     actions = actions    
+            actions = list(actions) 
+    
+            if self.add_noop_action:
+                actions.append(self.NOOP)
+        
+        else: # if cont. action space
+            actions = self.game.actions
+            
+        #print("PLE getActionSet, returns actions: ", actions)
         return actions
 
     def getFrameNumber(self):
@@ -373,6 +383,7 @@ class PLE(object):
             Returns the reward that the agent has accumlated while performing the action.
 
         """
+        
         return sum(self._oneStepAct(action) for i in range(self.frame_skip))
 
     def _draw_frame(self):
@@ -391,6 +402,8 @@ class PLE(object):
 
         if action not in self.getActionSet():
             action = self.NOOP
+
+        #print("PLE _Onestepact action: ", action)
 
         self._setAction(action)
         for i in range(self.num_steps):
