@@ -30,11 +30,15 @@ class PyGameWrapper(object):
         >>> }
     """
 
-    def __init__(self, width, height, actions={}):
+    def __init__(self, width, height, actions={}, discrete=True):
 
         # Required fields
         self.actions = actions  # holds actions
-
+        
+        self.discrete = discrete
+        self.last_action = []
+        self.action = []
+        
         self.score = 0.0  # required.
         self.lives = 0  # required. Can be 0 or -1 if not required.
         self.screen = None  # must be set to None
@@ -66,37 +70,42 @@ class PyGameWrapper(object):
         """
         Pushes the action to the pygame event queue.
         """
-        if action is None:
-            action = self.NOOP
-
-        if last_action is None:
-            last_action = self.NOOP
-
-        kd = pygame.event.Event(KEYDOWN, {"key": action})
-        ku = pygame.event.Event(KEYUP, {"key": last_action})
-        test = pygame.event.Event(KEYUP, {"key": []})
         
+        #print("pygamewrapper action: ", action)
+        #print("pygamewrapper last action: ", last_action)
         
-        """
-        http://www.pygame.org/docs/ref/event.html
-        http://www.pygame.org/docs/ref/event.html#pygame.event.Event
+        if self.discrete:
         
-        
-        
-        print(kd)
-        print(ku)
-        print("Test kd value",kd.type)
-        print("Test ku value",ku.type)
-        print("Action list: ", self.actions)
-        """
-        # http://www.pygame.org/docs/ref/event.html#pygame.event.post
-        # place a new event on the queue, in this case, kd followed by ku
-        
-        
-        pygame.event.post(kd)
-
-        if ku != test:
-            pygame.event.post(ku)
+            if action is None:
+                action = self.NOOP
+            if last_action is None:
+                last_action = self.NOOP
+                
+            kd = pygame.event.Event(KEYDOWN, {"key": action})
+            ku = pygame.event.Event(KEYUP, {"key": last_action})
+            test = pygame.event.Event(KEYUP, {"key": []})
+            
+            pygame.event.post(kd)
+            if ku != test:
+                pygame.event.post(ku)
+            
+            """
+            http://www.pygame.org/docs/ref/event.html
+            http://www.pygame.org/docs/ref/event.html#pygame.event.Event
+            
+            print(kd)
+            print(ku)
+            print("Test kd value",kd.type)
+            print("Test ku value",ku.type)
+            print("Action list: ", self.actions)
+            
+            # http://www.pygame.org/docs/ref/event.html#pygame.event.post
+            # place a new event on the queue, in this case, kd followed by ku
+            """
+        else:
+            # if cont. action space
+            self.action = action
+            self.last_action = last_action
 
     def _draw_frame(self, draw_screen):
         """
