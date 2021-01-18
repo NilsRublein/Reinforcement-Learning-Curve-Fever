@@ -13,4 +13,4 @@ from ple.games.snake import Snake
 from ple.games.waterworld import WaterWorld
 from ple.games.curvefeverdiscrete import CurveFeverDiscrete
 from ple.games.curvefevercontinuous import CurveFeverContinuous
-from ple.games.curvefeverfullimage import CurveFeverFullImage
+
